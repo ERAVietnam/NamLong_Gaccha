@@ -88,25 +88,28 @@
     grid-template-columns: 1fr;
   }
 
+  /* Stage = "safe area" khít vùng ảnh nền thật (JS set geometry), mọi content nằm trong này */
   .stage {
+    position: fixed;
+    inset: 0;
     display: flex;
     flex-direction: column;
     align-items: center;
     justify-content: center;
     text-align: center;
-    padding: 40px;
-    gap: 24px;
+    padding: 2.5cqh 3cqw;
+    gap: 2cqh;
+    container-type: size; /* cho phép dùng cqw/cqh — đơn vị theo vùng ảnh */
   }
   /* Dờ̀i khối kết quả xuống dưới, tránh chồng lên 3 logo ở đầu ảnh nền */
-  .winner-display { margin-top: 14vh; }
+  .winner-display { margin-top: 12cqh; }
   /* ===== Vùng hiển thị ngườ̀i trúng ===== */
   .winner-display {
     display: flex;
     flex-direction: column;
     align-items: center;
-    gap: 4px;
-    min-height: 340px;
-    justify-content: center;
+    gap: 1cqh;
+    max-width: 94cqw; /* không bao giờ tràn ngang vùng ảnh */
     transition: transform 1s cubic-bezier(0.22, 1, 0.36, 1);
   }
   /* Phóng to khi đã có kết quả */
@@ -120,8 +123,10 @@
   }
   #spinLabel {
     font-size: 13px;
+    font-size: min(2.8cqw, 12cqh, 13px);
     font-weight: 600;
     letter-spacing: 5px;
+    letter-spacing: min(1.6cqw, 5px);
     text-transform: uppercase;
     color: rgba(0, 109, 136, 0.85);
     margin-bottom: 6px;
@@ -134,10 +139,14 @@
     transform: translateY(-8px);
   }
   .w-spin {
-    font-size: clamp(48px, 7vw, 88px);
+    font-size: 88px;
+    font-size: min(12cqw, 34cqh, 88px);
     font-weight: 800;
     letter-spacing: 6px;
+    letter-spacing: min(1.5cqw, 6px);
     line-height: 1.15;
+    max-width: 94cqw;
+    word-break: break-word;
     color: #003c4b;
     text-shadow:
       0 0 40px rgba(255, 255, 255, 0.9),
@@ -148,12 +157,15 @@
   .w-spin.settle { transform: translateY(90px) scale(0.4); opacity: 0; }
   /* ===== Kết quả đã chốt ===== */
   .name-zone { display: none; }
-  .name-zone.show { display: block; margin-top: 12px; }
+  .name-zone.show { display: block; margin-top: 2cqh; }
   .name-zone span {
     display: inline-block;
-    font-size: clamp(40px, 6vw, 72px);
+    font-size: 72px;
+    font-size: min(7.2cqw, 24cqh, 72px);
     font-weight: 800;
     letter-spacing: 2px;
+    letter-spacing: min(1cqw, 2px);
+    max-width: 94cqw;
     color: #003c4b;
     text-shadow:
       0 0 40px rgba(255, 255, 255, 0.9),
@@ -170,16 +182,18 @@
     width: 0;
     height: 2px;
     background: linear-gradient(90deg, transparent, var(--wp-gold), transparent);
-    margin: 18px 0 4px;
+    margin: 2cqh 0 0.5cqh;
     transition: width 0.8s ease;
   }
-  .divider.show { width: 280px; }
+  .divider.show { width: 280px; width: min(48cqw, 280px); }
 
   .meta-zone {
     display: none;
     align-items: center;
     gap: 22px;
+    gap: min(4cqw, 22px);
     margin-top: 18px;
+    margin-top: 2.5cqh;
   }
   .meta-zone.show { display: flex; animation: fadeUp 0.5s ease both; }
   @keyframes fadeUp {
@@ -187,16 +201,20 @@
     to   { opacity: 1; transform: translateY(0); }
   }
   .meta-zone .w-code {
-    font-size: clamp(22px, 2.8vw, 32px);
+    font-size: 32px;
+    font-size: min(5cqw, 16cqh, 32px);
     font-weight: 700;
     letter-spacing: 5px;
+    letter-spacing: min(1.2cqw, 5px);
     color: #8e6c1c;
     text-shadow: 0 0 24px rgba(255, 255, 255, 0.8);
   }
   .meta-zone .w-dept {
-    font-size: clamp(18px, 2.2vw, 26px);
+    font-size: 26px;
+    font-size: min(4cqw, 13cqh, 26px);
     font-weight: 600;
     letter-spacing: 4px;
+    letter-spacing: min(1cqw, 4px);
     text-transform: uppercase;
     color: #006d88;
     text-shadow: 0 0 20px rgba(255, 255, 255, 0.8);
@@ -217,7 +235,7 @@
     100% { transform: scale(1); }
   }
 
-  /* Nút QUAY — góc dưới trái, ngang cỡ nút danh sách */
+  /* Nút QUAY — góc dưới trái, ngang cỡ nút danh sách, co giãn theo màn hình */
   .spin-btn {
     position: fixed;
     left: 10px;
@@ -225,11 +243,13 @@
     z-index: 20;
     font-family: var(--wp-font);
     font-size: 13px;
+    font-size: clamp(10px, 3vw, 13px);
     font-weight: 600;
     letter-spacing: 1px;
     text-transform: uppercase;
     color: #fff;
     padding: 11px 20px;
+    padding: clamp(7px, 2.2vw, 11px) clamp(10px, 4vw, 20px);
     border: none;
     border-radius: 30px;
     cursor: pointer;
@@ -262,10 +282,12 @@
     z-index: 20;
     font-family: var(--wp-font);
     font-size: 13px;
+    font-size: clamp(10px, 3vw, 13px);
     font-weight: 600;
     letter-spacing: 1px;
     color: #fff;
     padding: 11px 20px;
+    padding: clamp(7px, 2.2vw, 11px) clamp(10px, 4vw, 20px);
     border-radius: 30px;
     cursor: pointer;
     background: linear-gradient(135deg, var(--wp-primary-hover), var(--wp-primary));
@@ -285,9 +307,12 @@
     background: var(--wp-gold);
     color: #003c4b;
     font-size: 11px;
+    font-size: clamp(9px, 2.4vw, 11px);
     font-weight: 800;
     min-width: 20px;
+    min-width: clamp(16px, 4.4vw, 20px);
     height: 20px;
+    height: clamp(16px, 4.4vw, 20px);
     border-radius: 10px;
     display: inline-flex;
     align-items: center;
@@ -398,9 +423,7 @@
   }
 
   @media (max-width: 760px) {
-    body { overflow-y: auto; }
-    .layout { height: auto; }
-    .winner-display.reveal { transform: scale(1.05); }
+    .winner-display.reveal { transform: scale(1.04); }
   }
 </style>
 </head>
@@ -840,23 +863,35 @@
     renderWinners();
   }
 
-  // ===== Căn 2 nút theo RÌA ẢNH NỀN THẬT (bỏ qua phần blur dư) =====
+  // ===== Căn TOÀN BỘ UI theo RÌA ẢNH NỀN THẬT (bỏ qua phần blur dư) =====
   const BG_ASPECT = 3556 / 2000; // tỷ lệ ảnh gốc
-  function updateBtnPositions() {
+  const stage = document.querySelector('.stage');
+  function updateLayout() {
     const W = window.innerWidth, H = window.innerHeight;
-    let imgLeft = 0, imgRight = W;
+    let imgLeft, imgTop, imgW, imgH;
     if (W / H > BG_ASPECT) {
-      // màn hình ngang hơn 16:9 → ảnh full chiều cao, 2 bên có blur
-      const imgW = H * BG_ASPECT;
-      imgLeft = (W - imgW) / 2;
-      imgRight = imgLeft + imgW;
+      // màn hình ngang hơn 16:9 → ảnh full chiều cao, blur 2 bên
+      imgH = H; imgW = H * BG_ASPECT;
+      imgLeft = (W - imgW) / 2; imgTop = 0;
+    } else {
+      // màn hình hẹp hơn 16:9 (mobile dọc) → ảnh full chiều ngang, blur trên/dưới
+      imgW = W; imgH = W / BG_ASPECT;
+      imgLeft = 0; imgTop = (H - imgH) / 2;
     }
-    // màn hình đúng/hẹp hơn 16:9 → ảnh full chiều ngang, rìa ảnh trùng rìa màn
+    // Stage khít vùng ảnh — mọi content nằm trong này
+    stage.style.left = imgLeft + 'px';
+    stage.style.top = imgTop + 'px';
+    stage.style.width = imgW + 'px';
+    stage.style.height = imgH + 'px';
+    // 2 nút bám rìa ảnh (trái/phải + đáy ảnh)
     spinBtn.style.left = (imgLeft + 10) + 'px';
-    listToggle.style.right = (W - imgRight + 10) + 'px';
+    listToggle.style.right = (W - imgLeft - imgW + 10) + 'px';
+    spinBtn.style.bottom = (H - imgTop - imgH + 22) + 'px';
+    listToggle.style.bottom = spinBtn.style.bottom;
   }
-  window.addEventListener('resize', updateBtnPositions);
-  updateBtnPositions();
+  window.addEventListener('resize', updateLayout);
+  window.addEventListener('orientationchange', updateLayout);
+  updateLayout();
 
   // ===== Bong bóng nước nổi lên =====
   const wallpaper = document.getElementById('wallpaper');
