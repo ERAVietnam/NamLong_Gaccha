@@ -268,6 +268,14 @@
       inset 0 1px 0 rgba(255, 255, 255, 0.2);
   }
   .spin-btn:disabled { opacity: 0.45; cursor: not-allowed; transform: none; }
+  /* Trạng thái đang quay — nút Dừng */
+  .spin-btn.stopping {
+    background: linear-gradient(135deg, #c73650, #8e2438);
+    border-color: rgba(255, 154, 160, 0.55);
+  }
+  .spin-btn.stopping:hover:not(:disabled) {
+    box-shadow: 0 12px 50px rgba(199, 54, 80, 0.45);
+  }
   .spin-btn.glow { animation: btnGlow 1.6s ease-in-out infinite; }
   @keyframes btnGlow {
     0%, 100% { box-shadow: 0 12px 40px rgba(0, 109, 136, 0.45); }
@@ -303,23 +311,6 @@
     box-shadow: 0 8px 30px rgba(224, 177, 74, 0.4);
     border-color: var(--wp-gold);
   }
-  .list-toggle .badge {
-    background: var(--wp-gold);
-    color: #003c4b;
-    font-size: 11px;
-    font-size: clamp(9px, 2.4vw, 11px);
-    font-weight: 800;
-    min-width: 20px;
-    min-width: clamp(16px, 4.4vw, 20px);
-    height: 20px;
-    height: clamp(16px, 4.4vw, 20px);
-    border-radius: 10px;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    padding: 0 6px;
-  }
-
   /* ===== Modal danh sách trúng ===== */
   .modal-overlay {
     position: fixed;
@@ -378,12 +369,59 @@
     transition: all 0.2s;
   }
   .modal-close:hover { color: #fff; background: rgba(127, 211, 227, 0.12); }
-  .modal-sub {
-    font-size: 12px;
-    font-weight: 100;
+  /* Tabs */
+  .modal-tabs {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 14px;
+  }
+  .tab-btn {
+    flex: 1;
+    font-family: var(--wp-font);
+    font-size: 13px;
+    font-weight: 600;
+    letter-spacing: 1px;
+    padding: 9px;
     color: var(--wp-tint);
-    opacity: 0.7;
-    margin-bottom: 16px;
+    background: rgba(0, 0, 0, 0.25);
+    border: 1px solid rgba(127, 211, 227, 0.2);
+    border-radius: 10px;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+  .tab-btn:hover { border-color: var(--wp-tint); }
+  .tab-btn.active {
+    color: #003c4b;
+    background: var(--wp-gold);
+    border-color: var(--wp-gold);
+    font-weight: 700;
+  }
+  /* Ô search */
+  .search-box { margin-bottom: 12px; }
+  #searchInput {
+    width: 100%;
+    font-family: var(--wp-font);
+    font-size: 14px;
+    color: #fff;
+    background: rgba(0, 0, 0, 0.3);
+    border: 1px solid rgba(127, 211, 227, 0.25);
+    border-radius: 10px;
+    padding: 10px 14px;
+  }
+  #searchInput:focus { outline: none; border-color: var(--wp-tint); }
+  #searchInput::placeholder { color: rgba(127, 211, 227, 0.4); }
+  /* Ngườ̀i đã trúng trong tab danh sách */
+  .modal-list li.drawn { opacity: 0.4; border-left-color: rgba(127, 211, 227, 0.4); }
+  .modal-list li.drawn .wname::after {
+    content: 'Đã trúng';
+    font-size: 10px;
+    font-weight: 600;
+    color: var(--wp-tint);
+    border: 1px solid rgba(127, 211, 227, 0.4);
+    border-radius: 6px;
+    padding: 1px 6px;
+    margin-left: 8px;
+    vertical-align: middle;
   }
   .modal-list {
     list-style: none;
@@ -454,21 +492,27 @@
     </main>
   </div>
 
-  <!-- Nút mở danh sách trúng -->
+  <!-- Nút mở danh sách -->
   <button class="list-toggle" id="listToggle">
-    <span>Danh sách trúng</span>
-    <span class="badge" id="drawnCount">0</span>
+    <span>Danh sách</span>
   </button>
 
-  <!-- Modal danh sách trúng -->
+  <!-- Modal danh sách -->
   <div class="modal-overlay" id="modalOverlay">
     <div class="modal">
       <div class="modal-head">
-        <h2 class="modal-title">Danh sách trúng thưởng</h2>
+        <h2 class="modal-title">Danh sách</h2>
         <button class="modal-close" id="modalClose">&times;</button>
       </div>
-      <p class="modal-sub">Ngườ̀i mới nhất hiển thị đầu tiên</p>
+      <div class="modal-tabs">
+        <button class="tab-btn active" id="tabHistory" type="button">Lịch sử</button>
+        <button class="tab-btn" id="tabAll" type="button">Danh sách</button>
+      </div>
+      <div class="search-box" id="searchBox">
+        <input type="text" id="searchInput" placeholder="Tìm theo CODE..." autocomplete="off">
+      </div>
       <ol class="modal-list" id="modalList"><li class="empty">Chưa có ai trúng</li></ol>
+      <ol class="modal-list" id="allList" style="display:none"></ol>
     </div>
   </div>
 
@@ -486,10 +530,14 @@
   const wDept = document.getElementById('wDept');
   const spinBtn = document.getElementById('spinBtn');
   const listToggle = document.getElementById('listToggle');
-  const drawnCount = document.getElementById('drawnCount');
   const modalOverlay = document.getElementById('modalOverlay');
   const modalClose = document.getElementById('modalClose');
   const modalList = document.getElementById('modalList');
+  const allList = document.getElementById('allList');
+  const tabHistory = document.getElementById('tabHistory');
+  const tabAll = document.getElementById('tabAll');
+  const searchBox = document.getElementById('searchBox');
+  const searchInput = document.getElementById('searchInput');
 
   let employees = [];
   let drawn = [];
@@ -655,7 +703,9 @@
   // Quay 1 field trong vùng spin-zone:
   // - label hiện lên phía trên
   // - value chạy random (perChar=false: 1 cụm dừng hẳn | perChar=true: khóa từng ký tự)
-  function spinField({ label, pool, final, perChar = false, freeMs }) {
+  // - indefinite=true: chạy vô hạn cho tới khi gọi fieldStop()
+  let currentField = null;
+  function spinField({ label, pool, final, perChar = false, freeMs = 0, indefinite = false }) {
     return new Promise(resolve => {
       spinLabel.textContent = label;
       spinLabel.classList.remove('hidden');
@@ -674,8 +724,25 @@
         units = [{
           final, display: pool[Math.floor(Math.random() * pool.length)],
           speed: 80 + Math.random() * 60, lastChange: 0, locked: false,
-          lock: freeMs + Math.random() * 400
+          lock: indefinite ? Infinity : freeMs + Math.random() * 400
         }];
+        if (indefinite) units.forEach(u => u.lock = Infinity);
+      }
+
+      // Cho phép field bên ngoài gọi stop() → gán nhịp khóa ngay từ hiện tại
+      if (indefinite) {
+        currentField = {
+          stop() {
+            const elapsed = performance.now() - start;
+            if (perChar) {
+              let t = elapsed + 300;
+              units.forEach(u => { u.lock = t; t += 180 + Math.random() * 120; });
+            } else {
+              units.forEach(u => { u.lock = elapsed + 400; });
+            }
+            currentField = null;
+          }
+        };
       }
 
       const start = performance.now();
@@ -720,6 +787,7 @@
         if (!allLocked) {
           requestAnimationFrame(frame);
         } else {
+          if (currentField) currentField = null;
           resolve();
         }
       }
@@ -741,41 +809,24 @@
     await sleep(150);
   }
 
-  // ===== Quay số =====
-  spinBtn.addEventListener('click', async () => {
-    const remaining = employees.filter(e => !drawn.some(d => d.code === e.code));
+  // ===== Quay số: bấm 1 lần = chạy random vô hạn, bấm lần 2 (Dừng) = ra kết quả =====
+  let spinning = false;
+  let currentWinner = null;
 
-    if (remaining.length === 0) {
-      alert('Đã quay hết toàn bộ danh sách!');
-      return;
-    }
+  async function resolveSpin(deptDone) {
+    const winner = currentWinner;
 
-    ensureAudio(); // bắt buộc có gesture của user trước khi phát âm thanh
-    spinBtn.disabled = true;
-    spinBtn.classList.remove('glow');
-    winnerDisplay.classList.remove('reveal');
-    divider.classList.remove('show');
-    nameZone.classList.remove('show');
-    metaZone.classList.remove('show');
-    // Dọn inline style từ vòng quay trước
-    nameZone.style.cssText = '';
-    spinZone.style.cssText = '';
-    wName.textContent = ''; wCode.textContent = ''; wDept.textContent = '';
-
-    const winner = remaining[Math.floor(Math.random() * remaining.length)];
-    const deptPool = [...new Set(employees.map(e => e.dept.toUpperCase()))];
-
-    // 1. BỘ PHẬN: chạy random rồi dừng hẳn
-    await spinField({ label: 'Bộ phận', pool: deptPool, final: winner.dept.toUpperCase(), freeMs: 2200 });
+    // Bộ phận khóa lại → thu nhỏ xuống
+    await deptDone;
     burst({ particleCount: 60, spread: 80 });
     await settle(wDept, winner.dept.toUpperCase());
 
-    // 2. CODE: khóa từng ký tự
-    await spinField({ label: 'Code', pool: CHARS.split(''), final: winner.code, perChar: true, freeMs: 900 });
+    // CODE: khóa từng ký tự → thu nhỏ xuống
+    await spinField({ label: 'Code', pool: CHARS.split(''), final: winner.code, perChar: true, freeMs: 700 });
     burst({ particleCount: 80, spread: 90 });
-    await settle(wCode, winner.code, 1500);
+    await settle(wCode, winner.code, 1200);
 
-    // 3. TÊN: chuyển cảnh mượt — name trượt mở xuống, vùng quay co lại tan biến
+    // TÊN: chuyển cảnh mượt — name trượt mở xuống, vùng quay co lại tan biến
     wName.textContent = winner.name;
     nameZone.style.display = 'block';
     nameZone.style.overflow = 'hidden';
@@ -809,10 +860,54 @@
       code: winner.code,
       time: `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`
     });
-    drawnCount.textContent = drawn.length;
     renderWinners();
+
+    // Trả nút về trạng thái Quay số
     spinBtn.disabled = false;
+    spinBtn.textContent = 'Quay số';
+    spinBtn.classList.remove('stopping');
     spinBtn.classList.add('glow');
+  }
+
+  spinBtn.addEventListener('click', () => {
+    if (!spinning) {
+      // ==== LẦN 1: BẮT ĐẦU QUAY ====
+      const remaining = employees.filter(e => !drawn.some(d => d.code === e.code));
+      if (remaining.length === 0) {
+        alert('Đã quay hết toàn bộ danh sách!');
+        return;
+      }
+      ensureAudio(); // gesture của user, cho phép phát âm thanh
+      spinning = true;
+      currentWinner = remaining[Math.floor(Math.random() * remaining.length)];
+
+      // Reset sân khấu
+      winnerDisplay.classList.remove('reveal');
+      divider.classList.remove('show');
+      nameZone.classList.remove('show');
+      metaZone.classList.remove('show');
+      nameZone.style.cssText = '';
+      spinZone.style.cssText = '';
+      wName.textContent = ''; wCode.textContent = ''; wDept.textContent = '';
+
+      // Đổi nút thành Dừng quay
+      spinBtn.textContent = 'Dừng quay';
+      spinBtn.classList.add('stopping');
+      spinBtn.classList.remove('glow');
+
+      // BỘ PHẬN chạy random VÔ HẠN cho tới khi user bấm Dừng
+      const deptPool = [...new Set(employees.map(e => e.dept.toUpperCase()))];
+      const deptDone = spinField({
+        label: 'Bộ phận', pool: deptPool,
+        final: currentWinner.dept.toUpperCase(), indefinite: true
+      });
+      resolveSpin(deptDone);
+    } else {
+      // ==== LẦN 2: DỪNG QUAY → bắt đầu ra kết quả ====
+      spinning = false;
+      spinBtn.disabled = true;
+      if (currentField) currentField.stop();
+    }
   });
 
 
@@ -834,8 +929,43 @@
     }).join('');
   }
 
+  // ===== Tabs & search trong modal =====
+  function showTab(which) {
+    const isHistory = which === 'history';
+    tabHistory.classList.toggle('active', isHistory);
+    tabAll.classList.toggle('active', !isHistory);
+    modalList.style.display = isHistory ? '' : 'none';
+    allList.style.display = isHistory ? 'none' : '';
+    searchBox.style.display = isHistory ? 'none' : '';
+    if (!isHistory) renderAll(searchInput.value.trim().toUpperCase());
+  }
+  tabHistory.addEventListener('click', () => showTab('history'));
+  tabAll.addEventListener('click', () => showTab('all'));
+  searchInput.addEventListener('input', () => {
+    renderAll(searchInput.value.trim().toUpperCase());
+  });
+
+  // Danh sách tất cả ngườ̀i trong JSON, lọc theo CODE
+  function renderAll(codeFilter = '') {
+    const drawnCodes = new Set(drawn.map(d => d.code));
+    const filtered = employees.filter(e =>
+      !codeFilter || e.code.toUpperCase().includes(codeFilter)
+    );
+    if (filtered.length === 0) {
+      allList.innerHTML = '<li class="empty">Không tìm thấy</li>';
+      return;
+    }
+    allList.innerHTML = filtered.map(emp => `
+      <li class="${drawnCodes.has(emp.code) ? 'drawn' : ''}">
+        <span class="wname">${emp.name}</span>
+        <span class="wmeta"><span>${emp.code} · ${emp.dept}</span></span>
+      </li>
+    `).join('');
+  }
+
   listToggle.addEventListener('click', () => {
     renderWinners();
+    renderAll(searchInput.value.trim().toUpperCase());
     modalOverlay.classList.add('open');
   });
   modalClose.addEventListener('click', () => modalOverlay.classList.remove('open'));
@@ -849,7 +979,6 @@
   // Reset về trạng thái ban đầu: 3 số 0
   function resetStage() {
     drawn = [];
-    drawnCount.textContent = '0';
     nameZone.classList.remove('show');
     metaZone.classList.remove('show');
     winnerDisplay.classList.remove('reveal');
