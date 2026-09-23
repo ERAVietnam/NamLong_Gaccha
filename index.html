@@ -1,0 +1,876 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Waterpoint — Quay số may mắn</title>
+<link rel="icon" href="data:,">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@100;400;600;700;800&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --wp-primary: #003c4b;
+    --wp-primary-hover: #006d88;
+    --wp-tint: #7fd3e3;
+    --wp-gold: #e0b14a;
+    --wp-canvas: #0a1214;
+    --wp-surface: #0a2a34;
+    --wp-surface-2: #00232c;
+    --wp-white: #ffffff;
+    --wp-font: Montserrat, -apple-system, "Segoe UI", sans-serif;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  html, body { height: 100%; }
+
+  body {
+    font-family: var(--wp-font);
+    background: var(--wp-canvas);
+    color: var(--wp-white);
+    overflow: hidden;
+    position: relative;
+  }
+
+  /* ===== Background ảnh LED thương hiệu ===== */
+  .wallpaper {
+    position: fixed;
+    inset: 0;
+    z-index: 0;
+    overflow: hidden;
+    background: #0a2a34;
+  }
+  /* Lớp nền blur trùng màu ảnh, lấp phần thừa */
+  .wallpaper .bg-blur {
+    position: absolute;
+    inset: -60px; /* tràn ra ngoài để mép blur không bị cứng */
+    background: url("Nam Long Experience - BG LED 16_9.jpg") no-repeat center center;
+    background-size: cover;
+    filter: blur(45px) saturate(1.15);
+  }
+  /* Ảnh gốc hiển thị trọn vẹn, không méo */
+  .wallpaper .bg-full {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+  }
+  /* Vignette nhẹ 2 đầu giúp chữ dễ đọc hơn */
+  .wallpaper::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background:
+      linear-gradient(180deg, rgba(10, 18, 20, 0.22) 0%, transparent 20%, transparent 74%, rgba(10, 18, 20, 0.28) 100%);
+  }
+  .particle {
+    position: absolute;
+    border-radius: 50%;
+    background: radial-gradient(circle at 30% 30%, rgba(255,255,255,0.25), rgba(127, 211, 227, 0.08));
+    animation: rise linear infinite;
+    bottom: -40px;
+  }
+  @keyframes rise {
+    from { transform: translateY(0); opacity: 0; }
+    10%  { opacity: 1; }
+    90%  { opacity: 1; }
+    to   { transform: translateY(-110vh); opacity: 0; }
+  }
+
+  /* ===== Layout ===== */
+  .layout {
+    position: relative;
+    z-index: 1;
+    height: 100vh;
+    display: grid;
+    grid-template-columns: 1fr;
+  }
+
+  .stage {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    padding: 40px;
+    gap: 24px;
+  }
+  /* Dờ̀i khối kết quả xuống dưới, tránh chồng lên 3 logo ở đầu ảnh nền */
+  .winner-display { margin-top: 14vh; }
+  /* ===== Vùng hiển thị ngườ̀i trúng ===== */
+  .winner-display {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+    min-height: 340px;
+    justify-content: center;
+    transition: transform 1s cubic-bezier(0.22, 1, 0.36, 1);
+  }
+  /* Phóng to khi đã có kết quả */
+  .winner-display.reveal { transform: scale(1.18); }
+
+  /* ===== Vùng quay (1 field tại 1 thởi điểm) ===== */
+  .spin-zone {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+  }
+  #spinLabel {
+    font-size: 13px;
+    font-weight: 600;
+    letter-spacing: 5px;
+    text-transform: uppercase;
+    color: rgba(0, 109, 136, 0.85);
+    margin-bottom: 6px;
+    opacity: 1;
+    transform: translateY(0);
+    transition: opacity 0.35s ease, transform 0.35s ease;
+  }
+  #spinLabel.hidden {
+    opacity: 0;
+    transform: translateY(-8px);
+  }
+  .w-spin {
+    font-size: clamp(48px, 7vw, 88px);
+    font-weight: 800;
+    letter-spacing: 6px;
+    line-height: 1.15;
+    color: #003c4b;
+    text-shadow:
+      0 0 40px rgba(255, 255, 255, 0.9),
+      0 0 24px rgba(224, 177, 74, 0.45);
+    transition: transform 0.5s cubic-bezier(0.5, 0, 0.5, 1), opacity 0.5s ease;
+  }
+  /* Value đã chốt: thu nhỏ + trượt xuống + mờ dần */
+  .w-spin.settle { transform: translateY(90px) scale(0.4); opacity: 0; }
+  /* ===== Kết quả đã chốt ===== */
+  .name-zone { display: none; }
+  .name-zone.show { display: block; margin-top: 12px; }
+  .name-zone span {
+    display: inline-block;
+    font-size: clamp(40px, 6vw, 72px);
+    font-weight: 800;
+    letter-spacing: 2px;
+    color: #003c4b;
+    text-shadow:
+      0 0 40px rgba(255, 255, 255, 0.9),
+      0 0 24px rgba(224, 177, 74, 0.45);
+  }
+  .name-zone.show span { animation: nameIn 0.7s cubic-bezier(0.22, 1, 0.36, 1) both; }
+  @keyframes nameIn {
+    from { opacity: 0; transform: scale(1.3); }
+    to   { opacity: 1; transform: scale(1); }
+  }
+
+  /* Divider dưới tên */
+  .divider {
+    width: 0;
+    height: 2px;
+    background: linear-gradient(90deg, transparent, var(--wp-gold), transparent);
+    margin: 18px 0 4px;
+    transition: width 0.8s ease;
+  }
+  .divider.show { width: 280px; }
+
+  .meta-zone {
+    display: none;
+    align-items: center;
+    gap: 22px;
+    margin-top: 18px;
+  }
+  .meta-zone.show { display: flex; animation: fadeUp 0.5s ease both; }
+  @keyframes fadeUp {
+    from { opacity: 0; transform: translateY(12px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+  .meta-zone .w-code {
+    font-size: clamp(22px, 2.8vw, 32px);
+    font-weight: 700;
+    letter-spacing: 5px;
+    color: #8e6c1c;
+    text-shadow: 0 0 24px rgba(255, 255, 255, 0.8);
+  }
+  .meta-zone .w-dept {
+    font-size: clamp(18px, 2.2vw, 26px);
+    font-weight: 600;
+    letter-spacing: 4px;
+    text-transform: uppercase;
+    color: #006d88;
+    text-shadow: 0 0 20px rgba(255, 255, 255, 0.8);
+  }
+  /* Từng đơn vị (từ/ký tự) khi quay */
+  .u { display: inline-block; }
+  .u.rolling {
+    opacity: 0.35;
+    filter: blur(1px);
+  }
+  .u.locked {
+    opacity: 1;
+    filter: none;
+    animation: lockPop 0.25s ease;
+  }
+  @keyframes lockPop {
+    0% { transform: scale(1.35); }
+    100% { transform: scale(1); }
+  }
+
+  /* Nút QUAY — góc dưới trái, ngang cỡ nút danh sách */
+  .spin-btn {
+    position: fixed;
+    left: 10px;
+    bottom: 22px;
+    z-index: 20;
+    font-family: var(--wp-font);
+    font-size: 13px;
+    font-weight: 600;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    color: #fff;
+    padding: 11px 20px;
+    border: none;
+    border-radius: 30px;
+    cursor: pointer;
+    background: linear-gradient(135deg, var(--wp-primary-hover), var(--wp-primary));
+    border: 1px solid rgba(127, 211, 227, 0.45);
+    box-shadow:
+      0 12px 40px rgba(0, 109, 136, 0.45),
+      inset 0 1px 0 rgba(255, 255, 255, 0.15);
+    transition: transform 0.2s, box-shadow 0.2s, filter 0.2s;
+  }
+  .spin-btn:hover:not(:disabled) {
+    transform: scale(1.05);
+    filter: brightness(1.15);
+    box-shadow:
+      0 12px 50px rgba(224, 177, 74, 0.35),
+      inset 0 1px 0 rgba(255, 255, 255, 0.2);
+  }
+  .spin-btn:disabled { opacity: 0.45; cursor: not-allowed; transform: none; }
+  .spin-btn.glow { animation: btnGlow 1.6s ease-in-out infinite; }
+  @keyframes btnGlow {
+    0%, 100% { box-shadow: 0 12px 40px rgba(0, 109, 136, 0.45); }
+    50% { box-shadow: 0 12px 60px rgba(224, 177, 74, 0.5); }
+  }
+
+  /* ===== Nút mở danh sách (góc phải dưới) ===== */
+  .list-toggle {
+    position: fixed;
+    right: 10px;
+    bottom: 22px;
+    z-index: 20;
+    font-family: var(--wp-font);
+    font-size: 13px;
+    font-weight: 600;
+    letter-spacing: 1px;
+    color: #fff;
+    padding: 11px 20px;
+    border-radius: 30px;
+    cursor: pointer;
+    background: linear-gradient(135deg, var(--wp-primary-hover), var(--wp-primary));
+    border: 1px solid rgba(127, 211, 227, 0.5);
+    box-shadow: 0 8px 24px rgba(0, 60, 75, 0.45);
+    transition: transform 0.2s, box-shadow 0.2s;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .list-toggle:hover {
+    transform: scale(1.06);
+    box-shadow: 0 8px 30px rgba(224, 177, 74, 0.4);
+    border-color: var(--wp-gold);
+  }
+  .list-toggle .badge {
+    background: var(--wp-gold);
+    color: #003c4b;
+    font-size: 11px;
+    font-weight: 800;
+    min-width: 20px;
+    height: 20px;
+    border-radius: 10px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0 6px;
+  }
+
+  /* ===== Modal danh sách trúng ===== */
+  .modal-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 30;
+    background: rgba(10, 18, 20, 0.55);
+    backdrop-filter: blur(6px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.25s ease;
+  }
+  .modal-overlay.open {
+    opacity: 1;
+    pointer-events: auto;
+  }
+  .modal {
+    width: min(480px, 92vw);
+    max-height: 78vh;
+    display: flex;
+    flex-direction: column;
+    background: rgba(0, 35, 44, 0.92);
+    backdrop-filter: blur(20px);
+    border: 1px solid rgba(127, 211, 227, 0.3);
+    border-radius: 18px;
+    box-shadow: 0 30px 80px rgba(0, 0, 0, 0.55), 0 0 60px rgba(0, 109, 136, 0.25);
+    padding: 24px;
+    transform: translateY(16px) scale(0.97);
+    transition: transform 0.25s ease;
+  }
+  .modal-overlay.open .modal { transform: translateY(0) scale(1); }
+  .modal-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 4px;
+  }
+  .modal-title {
+    font-size: 15px;
+    font-weight: 700;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    color: var(--wp-gold);
+  }
+  .modal-close {
+    background: none;
+    border: none;
+    color: var(--wp-tint);
+    font-size: 26px;
+    line-height: 1;
+    cursor: pointer;
+    padding: 4px 8px;
+    border-radius: 8px;
+    transition: all 0.2s;
+  }
+  .modal-close:hover { color: #fff; background: rgba(127, 211, 227, 0.12); }
+  .modal-sub {
+    font-size: 12px;
+    font-weight: 100;
+    color: var(--wp-tint);
+    opacity: 0.7;
+    margin-bottom: 16px;
+  }
+  .modal-list {
+    list-style: none;
+    flex: 1;
+    overflow-y: auto;
+    margin: 0 -6px;
+    padding: 0 6px;
+  }
+  .modal-list::-webkit-scrollbar { width: 5px; }
+  .modal-list::-webkit-scrollbar-thumb { background: rgba(127, 211, 227, 0.3); border-radius: 3px; }
+  .modal-list li {
+    background: rgba(0, 0, 0, 0.3);
+    border-left: 3px solid var(--wp-gold);
+    border-radius: 10px;
+    padding: 11px 14px;
+    margin-bottom: 8px;
+    animation: slideIn 0.3s ease;
+  }
+  .modal-list li:first-child {
+    border-left-color: var(--wp-tint);
+    background: rgba(0, 109, 136, 0.25);
+  }
+  @keyframes slideIn {
+    from { opacity: 0; transform: translateY(10px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+  .modal-list .wname { font-size: 15px; font-weight: 600; display: block; margin-bottom: 2px; }
+  .modal-list .wmeta { font-size: 12px; opacity: 0.65; letter-spacing: 0.5px; display: flex; justify-content: space-between; align-items: center; gap: 10px; }
+  .modal-list .wtime { color: var(--wp-tint); font-weight: 600; }
+  .modal-list .empty {
+    border-left: none;
+    opacity: 0.5;
+    font-size: 13px;
+    text-align: center;
+    padding: 28px 0;
+    background: none;
+  }
+
+  @media (max-width: 760px) {
+    body { overflow-y: auto; }
+    .layout { height: auto; }
+    .winner-display.reveal { transform: scale(1.05); }
+  }
+</style>
+</head>
+<body>
+  <!-- Wallpaper liquid kiểu iPhone -->
+  <div class="wallpaper" id="wallpaper">
+    <div class="bg-blur"></div>
+    <img class="bg-full" src="Nam Long Experience - BG LED 16_9.jpg" alt="">
+  </div>
+
+  <div class="layout">
+    <!-- Sân khấu chính (full màn hình) -->
+    <main class="stage">
+      <div class="winner-display" id="winnerDisplay">
+        <div class="name-zone" id="nameZone"><span id="wName"></span></div>
+        <div class="divider" id="divider"></div>
+        <div class="spin-zone" id="spinZone">
+          <div class="w-label hidden" id="spinLabel"></div>
+          <div class="w-value w-spin" id="spinValue">000</div>
+        </div>
+        <div class="meta-zone" id="metaZone">
+          <span class="w-code" id="wCode"></span>
+          <span class="w-dept" id="wDept"></span>
+        </div>
+      </div>
+
+      <button class="spin-btn glow" id="spinBtn">Quay số</button>
+    </main>
+  </div>
+
+  <!-- Nút mở danh sách trúng -->
+  <button class="list-toggle" id="listToggle">
+    <span>Danh sách trúng</span>
+    <span class="badge" id="drawnCount">0</span>
+  </button>
+
+  <!-- Modal danh sách trúng -->
+  <div class="modal-overlay" id="modalOverlay">
+    <div class="modal">
+      <div class="modal-head">
+        <h2 class="modal-title">Danh sách trúng thưởng</h2>
+        <button class="modal-close" id="modalClose">&times;</button>
+      </div>
+      <p class="modal-sub">Ngườ̀i mới nhất hiển thị đầu tiên</p>
+      <ol class="modal-list" id="modalList"><li class="empty">Chưa có ai trúng</li></ol>
+    </div>
+  </div>
+
+<script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.9.3/dist/confetti.browser.min.js"></script>
+<script>
+  const winnerDisplay = document.getElementById('winnerDisplay');
+  const divider = document.getElementById('divider');
+  const nameZone = document.getElementById('nameZone');
+  const metaZone = document.getElementById('metaZone');
+  const spinZone = document.getElementById('spinZone');
+  const spinLabel = document.getElementById('spinLabel');
+  const spinValue = document.getElementById('spinValue');
+  const wName = document.getElementById('wName');
+  const wCode = document.getElementById('wCode');
+  const wDept = document.getElementById('wDept');
+  const spinBtn = document.getElementById('spinBtn');
+  const listToggle = document.getElementById('listToggle');
+  const drawnCount = document.getElementById('drawnCount');
+  const modalOverlay = document.getElementById('modalOverlay');
+  const modalClose = document.getElementById('modalClose');
+  const modalList = document.getElementById('modalList');
+
+  let employees = [];
+  let drawn = [];
+
+  const CHARS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+
+  // ===== Load danh sách từ JSON =====
+  fetch('employees.json')
+    .then(res => res.json())
+    .then(data => {
+      employees = data;
+    })
+    .catch(() => {
+      spinValue.textContent = 'Lỗi dữ liệu';
+    });
+
+  // ===== Logic quay slot-machine =====
+  // Tên: từng TỪ chạy liên tục, khóa dần từng từ (từ khác vẫn chạy)
+  // Mã & Bộ phận: từng KÝ TỰ chạy liên tục, khóa dần từng ký tự
+  // Cả 3 chạy ĐỒNG THỜI, thứ tự khóa random
+  const sleep = ms => new Promise(r => setTimeout(r, ms));
+
+  // ===== Âm thanh (Web Audio API — không cần file mp3) =====
+  let audioCtx = null;
+  function ensureAudio() {
+    try {
+      if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      if (audioCtx.state === 'suspended') audioCtx.resume();
+    } catch (e) { /* trình duyệt không hỗ trợ */ }
+  }
+  // Tiếng tick khi đang quay
+  function playTick(pitch = 1) {
+    if (!audioCtx) return;
+    try {
+      const t = audioCtx.currentTime;
+      const o = audioCtx.createOscillator();
+      const g = audioCtx.createGain();
+      o.type = 'square';
+      o.frequency.value = (700 + Math.random() * 300) * pitch;
+      g.gain.setValueAtTime(0.05, t);
+      g.gain.exponentialRampToValueAtTime(0.001, t + 0.045);
+      o.connect(g).connect(audioCtx.destination);
+      o.start(t); o.stop(t + 0.05);
+    } catch (e) {}
+  }
+  // Tiếng "tách" khi 1 ký tự/từ khóa lại
+  function playLock(pitch = 1) {
+    if (!audioCtx) return;
+    try {
+      const t = audioCtx.currentTime;
+      const o = audioCtx.createOscillator();
+      const g = audioCtx.createGain();
+      o.type = 'triangle';
+      o.frequency.setValueAtTime(900 * pitch, t);
+      o.frequency.exponentialRampToValueAtTime(1400 * pitch, t + 0.07);
+      g.gain.setValueAtTime(0.12, t);
+      g.gain.exponentialRampToValueAtTime(0.001, t + 0.1);
+      o.connect(g).connect(audioCtx.destination);
+      o.start(t); o.stop(t + 0.11);
+    } catch (e) {}
+  }
+  // Nhạc chiến thắng khi quay xong — fanfare kèn + trống + hợp âm rền vang
+  function playWin() {
+    if (!audioCtx) return;
+    try {
+      const t0 = audioCtx.currentTime;
+
+      // 1. Giai điệu fanfare kiểu kèn trumpet (2 sawtooth detune + lowpass)
+      const melody = [
+        { f: 392.00, t: 0.00 },  // G4
+        { f: 523.25, t: 0.14 },  // C5
+        { f: 659.25, t: 0.28 },  // E5
+        { f: 783.99, t: 0.42 },  // G5
+        { f: 1046.5, t: 0.60 },  // C6
+      ];
+      melody.forEach(n => {
+        const t = t0 + n.t;
+        [-7, 7].forEach(cents => {
+          const o = audioCtx.createOscillator();
+          const g = audioCtx.createGain();
+          const flt = audioCtx.createBiquadFilter();
+          o.type = 'sawtooth';
+          o.frequency.value = n.f;
+          o.detune.value = cents;
+          flt.type = 'lowpass';
+          flt.frequency.setValueAtTime(600, t);
+          flt.frequency.exponentialRampToValueAtTime(3200, t + 0.05); // "attack" kèn mở
+          flt.frequency.exponentialRampToValueAtTime(1100, t + 0.24);
+          g.gain.setValueAtTime(0.0001, t);
+          g.gain.exponentialRampToValueAtTime(0.09, t + 0.02);
+          g.gain.exponentialRampToValueAtTime(0.001, t + 0.28);
+          o.connect(flt).connect(g).connect(audioCtx.destination);
+          o.start(t); o.stop(t + 0.32);
+        });
+      });
+
+      // 2. Trống trận (bass drop) đập theo nhịp melody
+      [0.0, 0.28, 0.60].forEach(dt => {
+        const t = t0 + dt;
+        const o = audioCtx.createOscillator();
+        const g = audioCtx.createGain();
+        o.type = 'sine';
+        o.frequency.setValueAtTime(150, t);
+        o.frequency.exponentialRampToValueAtTime(45, t + 0.18);
+        g.gain.setValueAtTime(0.35, t);
+        g.gain.exponentialRampToValueAtTime(0.001, t + 0.26);
+        o.connect(g).connect(audioCtx.destination);
+        o.start(t); o.stop(t + 0.3);
+      });
+
+      // 3. Hợp âm C major rền vang khi tên hiện
+      const chordT = t0 + 0.80;
+      [523.25, 659.25, 783.99, 1046.5].forEach(f => {
+        const o = audioCtx.createOscillator();
+        const g = audioCtx.createGain();
+        o.type = 'triangle';
+        o.frequency.value = f;
+        g.gain.setValueAtTime(0.0001, chordT);
+        g.gain.exponentialRampToValueAtTime(0.09, chordT + 0.03);
+        g.gain.exponentialRampToValueAtTime(0.001, chordT + 1.2);
+        o.connect(g).connect(audioCtx.destination);
+        o.start(chordT); o.stop(chordT + 1.3);
+      });
+
+      // 4. Chuông viền trên (sparkle)
+      [1568, 2093].forEach((f, i) => {
+        const t = chordT + 0.12 + i * 0.14;
+        const o = audioCtx.createOscillator();
+        const g = audioCtx.createGain();
+        o.type = 'sine';
+        o.frequency.value = f;
+        g.gain.setValueAtTime(0.0001, t);
+        g.gain.exponentialRampToValueAtTime(0.06, t + 0.01);
+        g.gain.exponentialRampToValueAtTime(0.001, t + 0.55);
+        o.connect(g).connect(audioCtx.destination);
+        o.start(t); o.stop(t + 0.65);
+      });
+    } catch (e) {}
+  }
+
+  // ===== Tung bông (canvas-confetti CDN) =====
+  const CONFETTI_COLORS = ['#003c4b', '#006d88', '#7fd3e3', '#e0b14a', '#ffffff'];
+  function burst(opts = {}) {
+    if (!window.confetti) return;
+    confetti(Object.assign({
+      particleCount: 70,
+      spread: 75,
+      origin: { x: 0.5, y: 0.65 },
+      colors: CONFETTI_COLORS,
+      disableForReducedMotion: true
+    }, opts));
+  }
+  function celebration() {
+    // 2 pháo bên hông
+    burst({ particleCount: 110, angle: 60, spread: 60, origin: { x: 0, y: 0.7 } });
+    burst({ particleCount: 110, angle: 120, spread: 60, origin: { x: 1, y: 0.7 } });
+    // bông tung giữa + bồi thêm 2 nhịp
+    burst({ particleCount: 130, spread: 100, origin: { x: 0.5, y: 0.6 } });
+    setTimeout(() => burst({ particleCount: 90, spread: 120, origin: { x: 0.5, y: 0.5 }, scalar: 0.9 }), 250);
+    setTimeout(() => burst({ particleCount: 70, spread: 140, origin: { x: 0.5, y: 0.45 }, scalar: 0.8 }), 500);
+  }
+
+  // Quay 1 field trong vùng spin-zone:
+  // - label hiện lên phía trên
+  // - value chạy random (perChar=false: 1 cụm dừng hẳn | perChar=true: khóa từng ký tự)
+  function spinField({ label, pool, final, perChar = false, freeMs }) {
+    return new Promise(resolve => {
+      spinLabel.textContent = label;
+      spinLabel.classList.remove('hidden');
+      spinValue.classList.remove('settle', 'done');
+
+      // Tạo units: 1 unit (dừng hẳn) hoặc nhiều unit per ký tự
+      let units;
+      if (perChar) {
+        units = final.split('').map(c => ({
+          final: c, display: CHARS[Math.floor(Math.random() * CHARS.length)],
+          speed: 70 + Math.random() * 70, lastChange: 0, locked: false, lock: 0
+        }));
+        let t = freeMs;
+        units.forEach(u => { u.lock = t; t += 280 + Math.random() * 160; });
+      } else {
+        units = [{
+          final, display: pool[Math.floor(Math.random() * pool.length)],
+          speed: 80 + Math.random() * 60, lastChange: 0, locked: false,
+          lock: freeMs + Math.random() * 400
+        }];
+      }
+
+      const start = performance.now();
+      let lastTick = 0;
+      let lockCount = 0;
+
+      // Chỉ vẽ lại khi nội dung thay đổi — tránh restart animation lockPop
+      let prevHtml = null;
+      function render() {
+        const html = units.map(u => {
+          const cls = u.locked ? 'u locked' : 'u rolling';
+          return `<span class="${cls}">${u.locked ? u.final : u.display}</span>`;
+        }).join('');
+        if (html !== prevHtml) {
+          spinValue.innerHTML = html;
+          prevHtml = html;
+        }
+      }
+      render();
+
+      function frame(now) {
+        const elapsed = now - start;
+        let allLocked = true;
+        units.forEach(u => {
+          if (!u.locked && elapsed >= u.lock) {
+            u.locked = true;
+            lockCount++;
+            playLock(1 + lockCount * 0.06); // khóa càng về sau pitch càng cao
+          }
+          if (!u.locked && now - u.lastChange > u.speed) {
+            u.display = pool[Math.floor(Math.random() * pool.length)];
+            u.lastChange = now;
+          }
+          if (!u.locked) allLocked = false;
+        });
+        // Tick đều khi đang quay
+        if (!allLocked && now - lastTick > 140) {
+          playTick();
+          lastTick = now;
+        }
+        render();
+        if (!allLocked) {
+          requestAnimationFrame(frame);
+        } else {
+          resolve();
+        }
+      }
+      requestAnimationFrame(frame);
+    });
+  }
+
+  // Value đã chốt: giữ nguyên ~2s cho xem, nhãn biến mất, value thu nhỏ trượt xuống dưới cùng
+  async function settle(metaEl, value, holdMs = 2000) {
+    await sleep(holdMs);
+    spinLabel.classList.add('hidden');
+    spinValue.classList.add('settle');
+    await sleep(480);
+    metaEl.textContent = value;
+    metaZone.classList.add('show');
+    // Xóa nội dung TRƯỚC khi gỡ settle — tránh value trở lại cỡ lớn ở giữa màn hình
+    spinValue.innerHTML = '';
+    spinValue.classList.remove('settle');
+    await sleep(150);
+  }
+
+  // ===== Quay số =====
+  spinBtn.addEventListener('click', async () => {
+    const remaining = employees.filter(e => !drawn.some(d => d.code === e.code));
+
+    if (remaining.length === 0) {
+      alert('Đã quay hết toàn bộ danh sách!');
+      return;
+    }
+
+    ensureAudio(); // bắt buộc có gesture của user trước khi phát âm thanh
+    spinBtn.disabled = true;
+    spinBtn.classList.remove('glow');
+    winnerDisplay.classList.remove('reveal');
+    divider.classList.remove('show');
+    nameZone.classList.remove('show');
+    metaZone.classList.remove('show');
+    // Dọn inline style từ vòng quay trước
+    nameZone.style.cssText = '';
+    spinZone.style.cssText = '';
+    wName.textContent = ''; wCode.textContent = ''; wDept.textContent = '';
+
+    const winner = remaining[Math.floor(Math.random() * remaining.length)];
+    const deptPool = [...new Set(employees.map(e => e.dept.toUpperCase()))];
+
+    // 1. BỘ PHẬN: chạy random rồi dừng hẳn
+    await spinField({ label: 'Bộ phận', pool: deptPool, final: winner.dept.toUpperCase(), freeMs: 2200 });
+    burst({ particleCount: 60, spread: 80 });
+    await settle(wDept, winner.dept.toUpperCase());
+
+    // 2. CODE: khóa từng ký tự
+    await spinField({ label: 'Code', pool: CHARS.split(''), final: winner.code, perChar: true, freeMs: 900 });
+    burst({ particleCount: 80, spread: 90 });
+    await settle(wCode, winner.code, 1500);
+
+    // 3. TÊN: chuyển cảnh mượt — name trượt mở xuống, vùng quay co lại tan biến
+    wName.textContent = winner.name;
+    nameZone.style.display = 'block';
+    nameZone.style.overflow = 'hidden';
+    spinZone.style.overflow = 'hidden';
+    const nameH = nameZone.scrollHeight;
+    const spinH = spinZone.offsetHeight;
+    nameZone.style.height = '0px';
+    spinZone.style.height = spinH + 'px';
+    nameZone.style.transition = 'height .55s cubic-bezier(0.22, 1, 0.36, 1)';
+    spinZone.style.transition = 'height .55s cubic-bezier(0.22, 1, 0.36, 1), opacity .35s ease';
+
+    // Force reflow rồi animate 2 vùng cùng lúc
+    void nameZone.offsetHeight;
+    nameZone.classList.add('show');
+    spinZone.style.opacity = '0';
+    nameZone.style.height = nameH + 'px';
+    spinZone.style.height = '0px';
+
+    // Nối tiếp: span tên fade-in (CSS), divider kéo ra, zoom toàn khối
+    setTimeout(() => { spinZone.style.display = 'none'; }, 580);
+    setTimeout(() => { divider.classList.add('show'); }, 280);
+    setTimeout(() => { winnerDisplay.classList.add('reveal'); }, 380);
+    setTimeout(() => { celebration(); playWin(); }, 420);
+    await sleep(650);
+    // Dọn inline style, giữ layout ổn định cho vòng sau
+    nameZone.style.cssText = '';
+    spinZone.style.cssText = 'display: none;';
+
+    const now = new Date();
+    drawn.push({
+      code: winner.code,
+      time: `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`
+    });
+    drawnCount.textContent = drawn.length;
+    renderWinners();
+    spinBtn.disabled = false;
+    spinBtn.classList.add('glow');
+  });
+
+
+
+  // ===== Modal danh sách trúng =====
+  function renderWinners() {
+    if (drawn.length === 0) {
+      modalList.innerHTML = '<li class="empty">Chưa có ai trúng</li>';
+      return;
+    }
+    // Ngườ̀i gần nhất lên đầu (bỏ số thứ tự tránh nhầm thứ hạng giải)
+    modalList.innerHTML = [...drawn].reverse().map(item => {
+      const emp = employees.find(e => e.code === item.code);
+      if (!emp) return '';
+      return `<li>
+        <span class="wname">${emp.name}</span>
+        <span class="wmeta"><span>${emp.code} · ${emp.dept}</span><span class="wtime">${item.time}</span></span>
+      </li>`;
+    }).join('');
+  }
+
+  listToggle.addEventListener('click', () => {
+    renderWinners();
+    modalOverlay.classList.add('open');
+  });
+  modalClose.addEventListener('click', () => modalOverlay.classList.remove('open'));
+  modalOverlay.addEventListener('click', e => {
+    if (e.target === modalOverlay) modalOverlay.classList.remove('open');
+  });
+  document.addEventListener('keydown', e => {
+    if (e.key === 'Escape') modalOverlay.classList.remove('open');
+  });
+
+  // Reset về trạng thái ban đầu: 3 số 0
+  function resetStage() {
+    drawn = [];
+    drawnCount.textContent = '0';
+    nameZone.classList.remove('show');
+    metaZone.classList.remove('show');
+    winnerDisplay.classList.remove('reveal');
+    divider.classList.remove('show');
+    nameZone.style.cssText = '';
+    spinZone.style.cssText = '';
+    spinValue.classList.remove('settle');
+    spinLabel.classList.add('hidden');
+    wName.textContent = ''; wCode.textContent = ''; wDept.textContent = '';
+    spinValue.textContent = '000';
+    renderWinners();
+  }
+
+  // ===== Căn 2 nút theo RÌA ẢNH NỀN THẬT (bỏ qua phần blur dư) =====
+  const BG_ASPECT = 3556 / 2000; // tỷ lệ ảnh gốc
+  function updateBtnPositions() {
+    const W = window.innerWidth, H = window.innerHeight;
+    let imgLeft = 0, imgRight = W;
+    if (W / H > BG_ASPECT) {
+      // màn hình ngang hơn 16:9 → ảnh full chiều cao, 2 bên có blur
+      const imgW = H * BG_ASPECT;
+      imgLeft = (W - imgW) / 2;
+      imgRight = imgLeft + imgW;
+    }
+    // màn hình đúng/hẹp hơn 16:9 → ảnh full chiều ngang, rìa ảnh trùng rìa màn
+    spinBtn.style.left = (imgLeft + 10) + 'px';
+    listToggle.style.right = (W - imgRight + 10) + 'px';
+  }
+  window.addEventListener('resize', updateBtnPositions);
+  updateBtnPositions();
+
+  // ===== Bong bóng nước nổi lên =====
+  const wallpaper = document.getElementById('wallpaper');
+  for (let i = 0; i < 18; i++) {
+    const p = document.createElement('div');
+    p.className = 'particle';
+    const size = 4 + Math.random() * 14;
+    p.style.width = size + 'px';
+    p.style.height = size + 'px';
+    p.style.left = Math.random() * 100 + '%';
+    p.style.animationDuration = 8 + Math.random() * 14 + 's';
+    p.style.animationDelay = -Math.random() * 20 + 's';
+    wallpaper.appendChild(p);
+  }
+</script>
+</body>
+</html>
