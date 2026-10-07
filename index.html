@@ -219,6 +219,24 @@
     color: #006d88;
     text-shadow: 0 0 20px rgba(255, 255, 255, 0.8);
   }
+  /* ===== Cột ký tự chạy DỌC (slot reel) ===== */
+  .u-col {
+    display: inline-block;
+    height: 1.15em;
+    overflow: hidden;
+    vertical-align: top;
+  }
+  .u-strip {
+    display: block;
+    will-change: transform;
+    opacity: 0.3; /* màu mờ khi đang lăn */
+    filter: blur(1px);
+    transition: opacity 0.3s ease, filter 0.3s ease;
+  }
+  .u-strip > span { display: block; height: 1.15em; line-height: 1.15em; }
+  .u-col.locked { animation: lockPop 0.25s ease; }
+  .u-col.locked .u-strip { opacity: 1; filter: none; } /* rõ nét khi đã khóa */
+
   /* Từng đơn vị (từ/ký tự) khi quay */
   .u { display: inline-block; }
   .u.rolling {
@@ -795,6 +813,137 @@
     });
   }
 
+  // ===== Quay dạng SLOT REEL: từng cột ký tự lăn DỌC liên tục, không dừng =====
+  // Mỗi ký tự đích = 1 cột (overflow hidden), bên trong là dải ký tự chạy dọc.
+  // Gọi stop() (bấm Dừng) → mỗi cột lăn nốt 1 đoạn rồi khóa dần vào ký tự đích.
+  function spinReel(label, final) {
+    return new Promise(resolve => {
+      spinLabel.textContent = label;
+      spinLabel.classList.remove('hidden');
+      spinValue.classList.remove('settle', 'done');
+      spinValue.innerHTML = '';
+
+      // Luôn dựng đủ 6 cột chạy — bất kể kết quả dài/ngắn (không lộ kết quả)
+      const SPIN_COLS = 6;
+      const makeUnit = () => {
+        const col = document.createElement('span');
+        col.className = 'u-col';
+        const strip = document.createElement('span');
+        strip.className = 'u-strip';
+        col.appendChild(strip);
+        spinValue.appendChild(col);
+        return {
+          final: null, col, strip,
+          offset: 0, speed: 160 + Math.random() * 140,
+          locked: false, target: null
+        };
+      };
+      const units = Array.from({ length: SPIN_COLS }, makeUnit);
+      const ch = units[0].col.clientHeight || 60; // chiều cao 1 ký tự (px)
+
+      const randChar = () => CHARS[Math.floor(Math.random() * CHARS.length)];
+      function ensureStrip(u) {
+        // Bơm ký tự ngẫu nhiên vào dải cho đủ độ dài cần lăn
+        const need = u.offset + ch * 3;
+        while (u.strip.children.length * ch < need) {
+          const s = document.createElement('span');
+          s.textContent = randChar();
+          u.strip.appendChild(s);
+        }
+        // Cắt phần đã lăn qua khỏi đầu dải để DOM không phình to (chỉ khi đang quay)
+        if (!stopping && u.offset > ch * 24 && u.strip.children.length > 30) {
+          const cut = 12;
+          for (let i = 0; i < cut; i++) u.strip.removeChild(u.strip.firstChild);
+          u.offset -= cut * ch;
+          u.strip.style.transform = `translateY(${-u.offset}px)`;
+        }
+      }
+
+      let stopping = false;
+      let last = performance.now();
+      let lastTick = 0;
+      let raf;
+
+      function frame(now) {
+        const dt = Math.min((now - last) / 1000, 0.05);
+        last = now;
+        let allLocked = true;
+        units.forEach(u => {
+          if (u.locked) return;
+          allLocked = false;
+          if (!stopping) {
+            u.offset += u.speed * dt; // lăn dọc liên tục
+            ensureStrip(u);
+            u.strip.style.transform = `translateY(${-u.offset}px)`;
+            if (now - lastTick > 140) { playTick(); lastTick = now; }
+          }
+        });
+        if (!allLocked) {
+          raf = requestAnimationFrame(frame);
+        } else {
+          if (currentField) currentField = null;
+          resolve();
+        }
+      }
+      units.forEach(ensureStrip);
+      raf = requestAnimationFrame(frame);
+
+      // Nút Dừng gọi stop() → từng cột lăn nốt 1 đoạn rồi khóa dần vào ký tự đích
+      currentField = {
+        stop() {
+          if (stopping) return;
+          stopping = true;
+          // Ký tự đích (ký tự trắng → &nbsp; để giữ độ rộng cột)
+          const finals = final.split('').map(c => (c === ' ' ? '\u00A0' : c));
+          const n = finals.length;
+
+          // Cột THỪA (n < 6): mờ dần rồi gỡ khỏi màn hình
+          units.slice(n).forEach(u => {
+            u.locked = true;
+            u.col.style.transition = 'opacity .35s ease';
+            u.col.style.opacity = '0';
+            setTimeout(() => u.col.remove(), 380);
+          });
+
+          // Cột THIẾU (n > 6): thêm cột mới vào chuỗi khóa
+          while (units.length < n) units.push(makeUnit());
+
+          // Khóa dần từng cột vào ký tự đích
+          let maxDur = 0;
+          units.forEach((u, i) => {
+            if (i >= n) return;
+            u.final = finals[i];
+            // Điểm khóa: vị trí chẵn kế tiếp sau 1 đoạn lăn nốt riêng của cột này
+            const minExtra = 340 + i * 170 + Math.random() * 120;
+            const k = Math.ceil((u.offset + minExtra) / ch);
+            while (u.strip.children.length <= k) {
+              const s = document.createElement('span');
+              s.textContent = randChar();
+              u.strip.appendChild(s);
+            }
+            u.strip.children[k].textContent = u.final; // ký tự đích nằm ngay ô nhìn thấy
+            u.target = k * ch;
+            const dur = 0.45 + i * 0.14;
+            const delay = i * 0.07;
+            u.strip.style.transition = `transform ${dur}s cubic-bezier(0.12, 0.8, 0.22, 1) ${delay}s`;
+            void u.strip.offsetHeight; // force reflow để transition chạy
+            u.strip.style.transform = `translateY(${-u.target}px)`;
+            maxDur = Math.max(maxDur, (dur + delay) * 1000);
+          });
+          // Khi cột cuối khóa xong → đánh dấu locked, phát tiếng khóa từng cột
+          setTimeout(() => {
+            units.forEach((u, i) => {
+              if (i >= n) return;
+              u.locked = true;
+              u.col.classList.add('locked');
+              setTimeout(() => playLock(1 + (i + 1) * 0.06), i * 90);
+            });
+          }, maxDur);
+        }
+      };
+    });
+  }
+
   // Value đã chốt: giữ nguyên ~2s cho xem, nhãn biến mất, value thu nhỏ trượt xuống dưới cùng
   async function settle(metaEl, value, holdMs = 2000) {
     await sleep(holdMs);
@@ -895,12 +1044,9 @@
       spinBtn.classList.add('stopping');
       spinBtn.classList.remove('glow');
 
-      // BỘ PHẬN chạy random VÔ HẠN cho tới khi user bấm Dừng
-      const deptPool = [...new Set(employees.map(e => e.dept.toUpperCase()))];
-      const deptDone = spinField({
-        label: 'Bộ phận', pool: deptPool,
-        final: currentWinner.dept.toUpperCase(), indefinite: true
-      });
+      // Giai đoạn quay: các cột ký tự lăn DỌC liên tục (slot reel),
+      // không dừng cho tới khi user bấm Dừng → khóa dần thành tên BỘ PHẬN
+      const deptDone = spinReel('Bộ phận', currentWinner.dept.toUpperCase());
       resolveSpin(deptDone);
     } else {
       // ==== LẦN 2: DỪNG QUAY → bắt đầu ra kết quả ====
