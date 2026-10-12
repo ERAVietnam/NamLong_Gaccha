@@ -375,6 +375,14 @@
     text-transform: uppercase;
     color: var(--wp-gold);
   }
+  .modal-count {
+    margin-left: 8px;
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0;
+    text-transform: none;
+    color: var(--wp-tint);
+  }
   .modal-close {
     background: none;
     border: none;
@@ -458,7 +466,7 @@
     margin-bottom: 8px;
     animation: slideIn 0.3s ease;
   }
-  .modal-list li:first-child {
+  #modalList li:first-child {
     border-left-color: var(--wp-tint);
     background: rgba(0, 109, 136, 0.25);
   }
@@ -519,7 +527,7 @@
   <div class="modal-overlay" id="modalOverlay">
     <div class="modal">
       <div class="modal-head">
-        <h2 class="modal-title">Danh sách</h2>
+        <h2 class="modal-title">Danh sách <span class="modal-count" id="modalCount">0 người đã trúng</span></h2>
         <button class="modal-close" id="modalClose">&times;</button>
       </div>
       <div class="modal-tabs">
@@ -556,9 +564,11 @@
   const tabAll = document.getElementById('tabAll');
   const searchBox = document.getElementById('searchBox');
   const searchInput = document.getElementById('searchInput');
+   const modalCount = document.getElementById('modalCount');
 
   let employees = [];
   let drawn = [];
+   let modalTab = 'history';
 
   const CHARS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
 
@@ -1060,6 +1070,7 @@
 
   // ===== Modal danh sách trúng =====
   function renderWinners() {
+    if (modalTab === 'history') modalCount.textContent = `${drawn.length} người đã trúng`;
     if (drawn.length === 0) {
       modalList.innerHTML = '<li class="empty">Chưa có ai trúng</li>';
       return;
@@ -1078,6 +1089,10 @@
   // ===== Tabs & search trong modal =====
   function showTab(which) {
     const isHistory = which === 'history';
+    modalTab = which;
+    modalCount.textContent = isHistory
+      ? `${drawn.length} người đã trúng`
+      : `Tổng ${employees.length} người`;
     tabHistory.classList.toggle('active', isHistory);
     tabAll.classList.toggle('active', !isHistory);
     modalList.style.display = isHistory ? '' : 'none';
@@ -1093,6 +1108,7 @@
 
   // Danh sách tất cả ngườ̀i trong JSON, lọc theo CODE
   function renderAll(codeFilter = '') {
+    if (modalTab === 'all') modalCount.textContent = `Tổng ${employees.length} người`;
     const drawnCodes = new Set(drawn.map(d => d.code));
     const filtered = employees.filter(e =>
       !codeFilter || e.code.toUpperCase().includes(codeFilter)
